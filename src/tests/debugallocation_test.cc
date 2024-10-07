@@ -203,10 +203,14 @@ TEST(DebugAllocationTest, StackTraceWithDanglingWriteAtExitTest) {
   FooBar::StackTraceMarker(x);
   int old_x_value = *x;
   *x = 1;
-  // verify that we also get a stack trace when we have a dangling write.
-  // The " @ " is part of the stack trace output.
-  EXPECT_DEATH(exit(0), " @ .*FooBar::StackTraceMarker");
-  *x = old_x_value;  // restore x so that the test can exit successfully.
+  if (!getenv("TCM_DEBUG_BT_SYMBOLIZATION_TEST")) {
+    // verify that we also get a stack trace when we have a dangling write.
+    // The " @ " is part of the stack trace output.
+    EXPECT_DEATH(exit(0), " @ .*FooBar::StackTraceMarker");
+    *x = old_x_value;  // restore x so that the test can exit successfully.
+  } else {
+    exit(0);
+  }
 }
 
 static size_t CurrentlyAllocatedBytes() {
@@ -307,4 +311,17 @@ TEST(DebugAllocationTest, ReallocAfterMemalign) {
 
   int rv = memcmp(stuff, p, sizeof(stuff));
   EXPECT_EQ(rv, 0);
+}
+
+int main(int argc, char** argv) {
+#if __APPLE__
+  // OSX needs dsymutil crap
+  std::string cmd = "dsymutil ";
+  cmd += argv[0];
+  int result = system(cmd.c_str());
+  printf("OSX-specific '%s' -> %d\n", cmd.c_str(), result);
+#endif
+
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
